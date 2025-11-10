@@ -2,10 +2,9 @@
   "name": "library-book-checker-vercel",
   "version": "1.0.0",
   "description": "A web app to check library book availability.",
-  "main": "index.html",
   "type": "module",
   "dependencies": {
-    "jsdom": "^24.1.3"
+    "jsdom": "^24.0.0"
   },
   "scripts": {
     "start": "echo 'Run vercel dev to start'"
