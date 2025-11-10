@@ -1,0 +1,87 @@
+// Get references to our HTML elements
+const form = document.getElementById('search-form');
+const titleInput = document.getElementById('book-title');
+const loadingSpinner = document.getElementById('loading');
+const statusMessage = document.getElementById('status-message');
+const resultLink = document.getElementById('result-link');
+const searchButton = document.getElementById('search-button');
+
+// --- This section is the same as before ---
+const SEARCH_URL_TEMPLATE = 'https://sccl.bibliocommons.com/v2/search?query={SEARCH_TERM}&searchType=keyword&f_FORMAT=EBOOK%7CBK&f_STATUS=LA%7C_online_';
+const AVAILABILITY_SELECTOR = '[data-key="availability-status-available"]';
+const AVAILABLE_TEXT = 'Available';
+// --- End of configuration ---
+
+
+// Listen for the form to be submitted
+form.addEventListener('submit', function(event) {
+    event.preventDefault(); // Stop the form from reloading the page
+    const bookTitle = titleInput.value.trim();
+    if (bookTitle) {
+        searchForBook(bookTitle);
+    }
+});
+
+async function searchForBook(title) {
+    // Show loading spinner and clear old results
+    loadingSpinner.classList.remove('hidden');
+    statusMessage.textContent = '';
+    statusMessage.className = 'text-base font-medium';
+    resultLink.classList.add('hidden');
+    searchButton.disabled = true; // Disable button during search
+    searchButton.textContent = 'Searching...';
+
+    // Create the specific search URL
+    const searchUrl = SEARCH_URL_TEMPLATE.replace('{SEARCH_TERM}', encodeURIComponent(title));
+    
+    // Set the link for the user to click
+    resultLink.href = searchUrl;
+
+    try {
+        // 1. Fetch the library's search results page
+        // !!! THIS IS THE BIG CHANGE !!!
+        // No proxy, no CORS error, just a direct fetch.
+        // This works because we asked for "host_permissions" in manifest.json
+        const response = await fetch(searchUrl); 
+
+        if (!response.ok) {
+            throw new Error(`Network response was not ok (Status: ${response.status})`);
+        }
+        const htmlText = await response.text();
+
+        // 2. Parse the HTML text into a searchable document
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+
+        // 3. Find the availability status using the selector you provided
+        const statusElement = doc.querySelector(AVAILABILITY_SELECTOR);
+
+        if (statusElement) {
+            // 4. We found the element! Check its text.
+            const status = statusElement.textContent.trim();
+            if (status.includes(AVAILABLE_TEXT)) {
+                statusMessage.textContent = `"${title}" is likely AVAILABLE!`;
+                statusMessage.classList.add('text-green-600');
+            } else {
+                statusMessage.textContent = `"${title}" is likely CHECKED OUT.`;
+                statusMessage.classList.add('text-yellow-700');
+            }
+        } else {
+            // 5. We couldn't find the element.
+            statusMessage.textContent = `"${title}" was not found or is unavailable.`;
+            statusMessage.classList.add('text-red-600');
+        }
+        // Show the link to the results page
+        resultLink.classList.remove('hidden');
+
+    } catch (error) {
+        console.error('Fetch Error:', error);
+        statusMessage.textContent = `Error: Could not fetch results. Check your internet.`;
+        statusMessage.classList.add('text-red-600');
+    } finally {
+        // Hide loading spinner and re-enable button
+        loadingSpinner.classList.add('hidden');
+        searchButton.disabled = false;
+        searchButton.textContent = 'Search';
+    }
+}
