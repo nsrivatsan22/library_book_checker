@@ -1,87 +1,72 @@
-// Get references to our HTML elements
-const form = document.getElementById('search-form');
-const titleInput = document.getElementById('book-title');
-const loadingSpinner = document.getElementById('loading');
-const statusMessage = document.getElementById('status-message');
-const resultLink = document.getElementById('result-link');
-const searchButton = document.getElementById('search-button');
-
-// --- This section is the same as before ---
-const SEARCH_URL_TEMPLATE = 'https://sccl.bibliocommons.com/v2/search?query={SEARCH_TERM}&searchType=keyword&f_FORMAT=EBOOK%7CBK&f_STATUS=LA%7C_online_';
-const AVAILABILITY_SELECTOR = '[data-key="availability-status-available"]';
-const AVAILABLE_TEXT = 'Available';
-// --- End of configuration ---
-
-
-// Listen for the form to be submitted
-form.addEventListener('submit', function(event) {
-    event.preventDefault(); // Stop the form from reloading the page
-    const bookTitle = titleInput.value.trim();
-    if (bookTitle) {
-        searchForBook(bookTitle);
-    }
-});
-
-async function searchForBook(title) {
-    // Show loading spinner and clear old results
-    loadingSpinner.classList.remove('hidden');
-    statusMessage.textContent = '';
-    statusMessage.className = 'text-base font-medium';
-    resultLink.classList.add('hidden');
-    searchButton.disabled = true; // Disable button during search
-    searchButton.textContent = 'Searching...';
-
-    // Create the specific search URL
-    const searchUrl = SEARCH_URL_TEMPLATE.replace('{SEARCH_TERM}', encodeURIComponent(title));
-    
-    // Set the link for the user to click
-    resultLink.href = searchUrl;
-
-    try {
-        // 1. Fetch the library's search results page
-        // !!! THIS IS THE BIG CHANGE !!!
-        // No proxy, no CORS error, just a direct fetch.
-        // This works because we asked for "host_permissions" in manifest.json
-        const response = await fetch(searchUrl); 
-
-        if (!response.ok) {
-            throw new Error(`Network response was not ok (Status: ${response.status})`);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Library Book Search</title>
+    <!-- We're using Tailwind CSS for styling. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Using Inter font for a clean look */
+        body {
+            font-family: "Inter", sans-serif;
         }
-        const htmlText = await response.text();
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
 
-        // 2. Parse the HTML text into a searchable document
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(htmlText, 'text/html');
+    <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-6 md:p-8">
+        
+        <h1 class="text-2xl font-bold text-gray-800 text-center mb-4">
+            Library Book Checker
+        </h1>
+        <p class="text-center text-gray-600 mb-6">
+            Enter a book title to check its availability.
+        </p>
 
-        // 3. Find the availability status using the selector you provided
-        const statusElement = doc.querySelector(AVAILABILITY_SELECTOR);
+        <!-- Search Form -->
+        <form id="search-form" class="space-y-4">
+            <div>
+                <label for="book-title" class="sr-only">Book Title</label>
+                <input 
+                    type="text" 
+                    id="book-title" 
+                    placeholder="e.g., The Great Gatsby"
+                    required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                >
+            </div>
+            <button 
+                type="submit"
+                id="search-button"
+                class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-200"
+            >
+                Search
+            </button>
+        </form>
 
-        if (statusElement) {
-            // 4. We found the element! Check its text.
-            const status = statusElement.textContent.trim();
-            if (status.includes(AVAILABLE_TEXT)) {
-                statusMessage.textContent = `"${title}" is likely AVAILABLE!`;
-                statusMessage.classList.add('text-green-600');
-            } else {
-                statusMessage.textContent = `"${title}" is likely CHECKED OUT.`;
-                statusMessage.classList.add('text-yellow-700');
-            }
-        } else {
-            // 5. We couldn't find the element.
-            statusMessage.textContent = `"${title}" was not found or is unavailable.`;
-            statusMessage.classList.add('text-red-600');
-        }
-        // Show the link to the results page
-        resultLink.classList.remove('hidden');
+        <!-- Results Area -->
+        <div id="results" class="mt-6 text-center" style="min-height: 50px;">
+            <!-- Loading spinner will be shown here -->
+            <div id="loading" class="hidden">
+                <svg class="animate-spin h-5 w-5 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                <p class="text-gray-600 mt-2">Checking for you...</p>
+            </div>
+            <!-- Status message will be shown here -->
+            <p id="status-message" class="text-lg font-medium"></p>
+            <a id="result-link" href="#" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline hidden">
+                View on library website
+            </a>
+        </div>
+    </div>
 
-    } catch (error) {
-        console.error('Fetch Error:', error);
-        statusMessage.textContent = `Error: Could not fetch results. Check your internet.`;
-        statusMessage.classList.add('text-red-600');
-    } finally {
-        // Hide loading spinner and re-enable button
-        loadingSpinner.classList.add('hidden');
-        searchButton.disabled = false;
-        searchButton.textContent = 'Search';
-    }
-}
+    <!-- Link to our front-end JavaScript -->
+    <!-- 🔴 THIS IS THE FIX 🔴 -->
+    <!-- We've changed "main.js" to "/main.js" to make it an absolute path. -->
+    <!-- This ensures it loads correctly with our Vercel routing rules. -->
+    <script src="/main.js"></script>
+</body>
+</html>
